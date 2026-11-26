@@ -23,10 +23,14 @@
     <!-- The one and only YouTube player. It is never moved in the DOM (moving an
          iframe reloads it); routes only change its CSS state. -->
     <section id="playerDock" aria-label="Video player" hidden>
-      <div class="dock-frame"><div id="ytHost"></div><div id="audioPanel" class="audio-panel" hidden></div></div>
+      <div class="dock-frame"><div id="ytHost"></div>
+        <!-- Demo picture: muted, follows #audioEl (js/player/video-follower.js). -->
+        <video id="videoEl" class="dock-video" muted playsinline webkit-playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true"></video>
+        <div id="audioPanel" class="audio-panel" hidden></div></div>
     </section>
 
-    <!-- Own audio (public-domain demo media): plays in the background / on the lock screen. -->
+    <!-- Own audio (public-domain demo media): the only sound source for demos, so it keeps
+         playing in the background / on the lock screen. -->
     <audio id="audioEl" preload="metadata" playsinline></audio>
 
     <!-- Shown outside the player route while a video is loaded (player paused). -->

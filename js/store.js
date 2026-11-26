@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   autoNext: false,            // after N repeats, move on to next sentence
   allAutoReplay: false,       // default Repeat All when opening content
   capMode: 'both',            // both | en | zh | blind (English blurred until played)
-  preferAudio: true,          // content with own audio (demos) opens in audio mode (background play)
+  demoView: 'video',          // demos (own audio): 'video' = muted synced video, 'audio' = cover only. Sound is the same either way.
   // Services (stored only in this browser)
   ytKey: '',
   trProvider: 'microsoft',    // microsoft | gemini | none

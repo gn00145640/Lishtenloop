@@ -23,6 +23,7 @@ import { parseYouTubeId, parseIsoDuration, fmtTime } from './js/util.js';
 import { store } from './js/store.js';
 import { AudioAdapter } from './js/player/audio-adapter.js';
 import { STATE } from './js/player/yt-adapter.js';
+import { VideoFollower } from './js/player/video-follower.js';
 
 const results = [];
 const test = (name, fn) => { try { fn(); results.push([name, true]); } catch (e) { results.push([name, false, e.message]); } };
@@ -282,6 +283,77 @@ test('LoopEngine single-sentence loop works on AudioAdapter (with offset)', () =
   ok(a.getTime() >= 2 && a.getTime() < 5.1, 'stays inside sentence');
 });
 
+// ---- VideoFollower: muted picture slaved to the audio clock ----
+function followerRig() {
+  const audio = fakeMedia(), video = fakeMedia();
+  video.readyState = 1; video.seeking = false; video.muted = false;
+  video.setAttribute = () => {};
+  const doc = new EventTarget(); doc.hidden = false;
+  const clock = { now: 0 };
+  const f = new VideoFollower(video, audio, { now: () => clock.now, doc });
+  f.src = 'v.mp4';
+  return { audio, video, doc, clock, f };
+}
+
+test('VideoFollower is muted and follows play / pause / seek of the audio', () => {
+  const { audio, video, f } = followerRig();
+  ok(video.muted, 'video muted');
+  f.setActive(true);
+  audio.currentTime = 12; audio.play();
+  ok(!video.paused, 'video plays with audio');
+  eq(video.currentTime, 12, 'video jumped to audio time');
+  audio.pause();
+  ok(video.paused, 'video pauses with audio');
+  audio.currentTime = 30; audio.dispatchEvent(new Event('seeked'));
+  eq(video.currentTime, 30, 'follows seeks');
+});
+
+test('VideoFollower drift: nudges small drift, jumps large drift (with cooldown)', () => {
+  const { audio, video, clock, f } = followerRig();
+  f.setActive(true);
+  audio.currentTime = 10; audio.play();
+  clock.now = 5000;
+  video.currentTime = 10.15; f.sync();
+  ok(video.playbackRate < 1 && video.currentTime === 10.15, 'ahead by 0.15 s → slowed, not jumped');
+  video.currentTime = 9.85; f.sync();
+  ok(video.playbackRate > 1, 'behind by 0.15 s → sped up');
+  video.currentTime = 10.02; f.sync();
+  eq(video.playbackRate, 1, 'in sync → normal speed');
+  video.currentTime = 8; f.sync();
+  eq(video.currentTime, 10, 'behind by 2 s → jumped');
+  clock.now += 200; video.currentTime = 8; f.sync();
+  eq(video.currentTime, 8, 'no second jump during cooldown (still buffering)');
+  clock.now += 1200; f.sync();
+  eq(video.currentTime, 10, 'jumps again after cooldown');
+  audio.setRate = null; audio.playbackRate = 1.5; video.currentTime = 10; f.sync();
+  eq(video.playbackRate, 1.5, 'copies audio speed');
+});
+
+test('VideoFollower pauses the picture when hidden, realigns on return; sound untouched', () => {
+  const { audio, video, doc, f } = followerRig();
+  f.setActive(true);
+  audio.currentTime = 5; audio.play();
+  doc.hidden = true; doc.dispatchEvent(new Event('visibilitychange'));
+  ok(video.paused, 'picture paused while hidden');
+  ok(!audio.paused, 'audio keeps playing');
+  audio.currentTime = 40; f.sync();
+  ok(video.paused, 'tick while hidden does not restart the picture');
+  doc.hidden = false; doc.dispatchEvent(new Event('visibilitychange'));
+  ok(!video.paused, 'picture resumes');
+  eq(video.currentTime, 40, 'picture caught up with the sound');
+  f.setActive(false);
+  ok(video.paused && !audio.paused, 'inactive (cover view / other page) pauses only the picture');
+});
+
+test('VideoFollower load error marks it unusable', () => {
+  const { video, f } = followerRig();
+  let failed = 0; f.on('fail', () => failed++);
+  video.dispatchEvent(new Event('error'));
+  ok(f.failed && !f.usable && failed === 1, 'failed → unusable');
+  f.load('other.mp4');
+  ok(!f.failed, 'new source resets failure');
+});
+
 // async checks
 (async () => {
   try {
@@ -297,9 +369,10 @@ test('LoopEngine single-sentence loop works on AudioAdapter (with offset)', () =
     const idx = await (await fetch('data/demo/index.json')).json();
     for (const it of idx.items) {
       ok(it.audio && /^https:\/\//.test(it.audio.src) && Number.isFinite(it.audio.offset), it.id + ' audio field');
+      ok(/^https:\/\/.+\.mp4/.test(it.video || ''), it.id + ' video field');
     }
-    results.push(['demo index: every demo has audio { src, offset }', true]);
-  } catch (e) { results.push(['demo index: every demo has audio { src, offset }', false, e.message]); }
+    results.push(['demo index: every demo has audio { src, offset } + video', true]);
+  } catch (e) { results.push(['demo index: every demo has audio { src, offset } + video', false, e.message]); }
   try {
     const idx = await (await fetch('data/demo/index.json')).json();
     for (const it of idx.items) {

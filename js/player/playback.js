@@ -2,12 +2,20 @@
 // and progress persistence. Views subscribe to it; navigating between pages never
 // creates another player.
 //
-// Sources:
+// Sources (what makes the sound):
 //   'video' — the official YouTube IFrame player (any video; foreground only).
 //   'audio' — our own HTML5 audio for content that ships an `audio` field
 //             (public-domain demo media): background + lock-screen playback, no ads.
+//             Always used when available; YouTube is then only a fallback.
+// View (what you see while source = 'audio'):
+//   'video' — a muted <video> of the same media that follows the audio clock
+//             (VideoFollower). Locking the screen pauses only the picture, so the
+//             sound never stutters.
+//   'audio' — cover art only (less data).
+// Switching the view never touches the sound.
 import { YouTubeAdapter, STATE } from './yt-adapter.js';
 import { AudioAdapter } from './audio-adapter.js';
+import { VideoFollower } from './video-follower.js';
 import { LoopEngine } from './loop-engine.js';
 import { enableMediaSession, disableMediaSession, setMediaMetadata, setMediaPlaying, setMediaPosition } from './media-session.js';
 import { store } from '../store.js';
@@ -22,6 +30,11 @@ class Playback {
     this.yt = new YouTubeAdapter('ytHost');
     this.aud = new AudioAdapter(document.getElementById('audioEl'));
     this.source = 'video';
+    this.vid = new VideoFollower(document.getElementById('videoEl'), this.aud.el);
+    this.view = 'video';
+    this.showingVideo = false;
+    this.onPlayerPage = false;
+    this.vid.on('fail', () => { console.warn('demo video failed; showing cover'); this.applyView(); this.emit('view', this.view); });
     this.engine = new LoopEngine(this.yt, () => store.settings);
     this.content = null;
     this.sentences = [];
@@ -56,6 +69,8 @@ class Playback {
   /** The adapter of the active source. */
   get adapter() { return this.source === 'audio' ? this.aud : this.yt; }
   get hasAudio() { return !!this.content?.audio?.src; }
+  /** The video/audio view switch applies: own audio is playing and a picture exists. */
+  get canShowVideo() { return this.source === 'audio' && !!this.content?.video && !this.vid.failed; }
 
   on(evt, fn) { (this.handlers[evt] ||= new Set()).add(fn); return () => this.handlers[evt].delete(fn); }
   emit(evt, data) { this.handlers[evt]?.forEach(fn => { try { fn(data); } catch (e) { console.error(e); } }); }
@@ -90,7 +105,8 @@ class Playback {
       const prog = store.getProgress(id);
       const start = prog && prog.time > 3 && !(prog.duration && prog.time > prog.duration - 5) ? prog.time - 1 : 0;
       document.getElementById('playerDock').hidden = false;
-      const src = this.hasAudio && store.settings.preferAudio ? 'audio' : 'video';
+      this.view = store.settings.demoView === 'audio' ? 'audio' : 'video';
+      const src = this.hasAudio ? 'audio' : 'video';
       try {
         await this.activate(src, start);
       } catch (e) {
@@ -138,28 +154,37 @@ class Playback {
       await this.yt.load(c.id, { start, autoplay: false, rate });
     }
     document.getElementById('playerDock').classList.toggle('audio-mode', src === 'audio');
+    this.applyView();
     this.emit('source', src);
   }
 
-  /** Switch between YouTube video and own audio, keeping position, speed and loop mode. */
-  async setSource(src) {
-    if (!this.content || src === this.source || this.switching) return;
-    if (src === 'audio' && !this.hasAudio) return;
-    this.switching = true;
-    try {
-      const t = this.adapter.isReady ? this.adapter.getTime() : 0;
-      const wasPlaying = this.adapter.isReady && (this.adapter.isPlaying() || this.engine.waiting);
-      this.engine.cancelWait(false);
-      this.adapter.pause();
-      this.save();
-      this.error = null;
-      store.setSetting('preferAudio', src === 'audio');
-      await this.activate(src, t);
-      this.engine.jumpTarget = t;
-      this.engine.guard();
-      if (wasPlaying) this.adapter.play();
-      this.startTimer();
-    } finally { this.switching = false; }
+  /** Show / hide the muted picture according to source, view and route. Never touches the sound. */
+  applyView() {
+    const c = this.content;
+    const want = this.source === 'audio' && this.view === 'video' && !!c?.video;
+    if (want) this.vid.load(c.video);
+    else if (this.source !== 'audio' || !c?.video) this.vid.load('');
+    const show = want && this.vid.usable;
+    this.showingVideo = show;
+    document.getElementById('playerDock').classList.toggle('video-view', show);
+    this.vid.setActive(show && this.onPlayerPage);
+  }
+
+  /** Switch the picture: 'video' (muted, synced video) or 'audio' (cover only). Sound keeps playing. */
+  setView(v) {
+    v = v === 'audio' ? 'audio' : 'video';
+    store.setSetting('demoView', v);
+    if (v === this.view) return;
+    this.view = v;
+    this.applyView();
+    this.saveSoon();
+    this.emit('view', v);
+  }
+
+  /** Router hook: the picture only moves while the player page is on screen. */
+  setPlayerPage(on) {
+    this.onPlayerPage = !!on;
+    this.applyView();
   }
 
   startTimer() {
@@ -178,7 +203,7 @@ class Playback {
     this.lastTickAt = now;
     if (idx !== this.idx) { this.idx = idx; this.emit('sentence', idx); if (this.source === 'audio') this.updateMetadata(); }
     this.emit('time', t);
-    if (this.source === 'audio') this.pushPosition();
+    if (this.source === 'audio') { this.pushPosition(); if (this.showingVideo) this.vid.sync(); }
     if (playing && now - this.lastSave > SAVE_EVERY_MS) this.save();
     // keep polling while paused too (slower), so seeks/taps while paused still update the highlight
     const want = playing || this.engine.waiting ? TICK_MS : IDLE_TICK_MS;
@@ -218,7 +243,7 @@ class Playback {
       id: c.id, title: c.title || a.getVideoData().title || '', channel: c.channel || a.getVideoData().author || '',
       thumb: c.thumb, isDemo: !!c.isDemo, duration,
       time: t, sentenceId: s?.id || null, sentenceIndex: s ? s.index : -1,
-      rate: a.getRate(), mode: this.engine.mode, source: this.source,
+      rate: a.getRate(), mode: this.engine.mode, source: this.source, view: this.view,
       addListened: Math.round(this.listenedAcc),
     });
     this.listenedAcc = 0;

@@ -6,10 +6,10 @@ import { playback } from '../player/playback.js';
 import { noticeHtml } from '../components.js';
 import { translateTexts, translationStatus } from '../translate/index.js';
 
-// Player page: in video mode YouTube's own controls (play, seek, fullscreen, volume) handle
-// transport; in audio mode the dock shows our audio panel (js/views/audio-panel.js).
-// The app adds speed, repeat-all, favorite (title bar), the video/audio switch and
-// sentence-level loops (captions).
+// Player page: with YouTube as the source, YouTube's own controls handle transport; with
+// own audio (demos) the dock shows our panel (js/views/audio-panel.js) over the muted
+// synced video or the cover. The app adds speed, repeat-all, favorite (title bar), the
+// video/audio view switch and sentence-level loops (captions).
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const LONG_PRESS_MS = 500;
 const AUTOSCROLL_PAUSE_MS = 3000;
@@ -31,7 +31,6 @@ export async function renderPlayer(view, id) {
   const sentences = playback.sentences;
   const engine = playback.engine;
   const A = () => playback.adapter;            // active source (YouTube or own audio) — may change
-  const hasAudio = playback.hasAudio;
   const S = { rangeAnchor: null, userScrollAt: 0, lastIdx: -1 };
   const cleanups = [];
 
@@ -46,10 +45,10 @@ export async function renderPlayer(view, id) {
       </div>
     </div>
     <div class="src-row">
-      ${hasAudio ? `<div class="seg" role="radiogroup" aria-label="${esc(t('audio.source'))}">
-        <button type="button" role="radio" data-src="video">${esc(t('audio.video'))}</button>
-        <button type="button" role="radio" data-src="audio">${icons.music}${esc(t('audio.audio'))}</button>
-      </div>` : ''}
+      <div class="seg" role="radiogroup" aria-label="${esc(t('audio.source'))}" hidden>
+        <button type="button" role="radio" data-view="video">${esc(t('audio.video'))}</button>
+        <button type="button" role="radio" data-view="audio">${icons.music}${esc(t('audio.audio'))}</button>
+      </div>
       <span class="src-note" id="srcNote"></span>
     </div>
     <div class="loop-status" id="loopStatus" aria-live="polite" hidden>
@@ -230,21 +229,24 @@ export async function renderPlayer(view, id) {
     S.userScrollAt = 0;
   }
 
-  // ---------- source: YouTube video ⇄ own audio ----------
+  // ---------- view: muted synced video ⇄ cover only (sound never changes) ----------
   function renderSource() {
-    const src = playback.source;
-    $$('[data-src]', view).forEach(b => {
-      const on = b.dataset.src === src;
+    const seg = view.querySelector('.seg');
+    const canSwitch = playback.canShowVideo;
+    seg.hidden = !canSwitch;
+    view.querySelector('.src-row').classList.toggle('has-seg', canSwitch);
+    const v = playback.showingVideo ? 'video' : 'audio';
+    $$('[data-view]', view).forEach(b => {
+      const on = b.dataset.view === v;
       b.classList.toggle('on', on);
       b.setAttribute('aria-checked', on);
     });
-    $('#srcNote', view).textContent = src === 'audio' ? t('audio.noteBg') : (hasAudio ? t('audio.noteVideo') : t('player.noBackground'));
+    $('#srcNote', view).textContent = playback.source !== 'audio' ? t('player.noBackground')
+      : (playback.showingVideo ? t('audio.noteVideoBg') : t('audio.noteBg'));
   }
-  view.querySelector('.seg')?.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-src]');
-    if (!b || b.dataset.src === playback.source) return;
-    try { await playback.setSource(b.dataset.src); }
-    catch (err) { console.error(err); toast(t('audio.err')); }
+  view.querySelector('.seg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-view]');
+    if (b) playback.setView(b.dataset.view);
   });
 
   async function chooseSpeed() {
@@ -303,6 +305,7 @@ export async function renderPlayer(view, id) {
   cleanups.push(playback.on('rate', (r) => renderSpeed(r)));
   cleanups.push(playback.on('error', () => renderCaptions()));
   cleanups.push(playback.on('ready', () => fillTitle()));
+  cleanups.push(playback.on('view', renderSource));
   cleanups.push(playback.on('source', () => {
     renderSource();
     renderSpeed();

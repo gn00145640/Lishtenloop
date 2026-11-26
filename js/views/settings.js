@@ -59,7 +59,8 @@ export function renderSettings(view, rerender) {
         <select id="repeatInterval" data-key="repeatInterval" data-type="num">${[0, 0.5, 1, 2, 3].map(v => opt(v, t('player.sec', { n: v }), st.repeatInterval)).join('')}</select></div>
       ${sw('autoNext', t('set.autoNext'), t('set.autoNextHint'))}
       ${sw('allAutoReplay', t('set.allAutoReplay'))}
-      ${sw('preferAudio', t('set.preferAudio'), t('set.preferAudioHint'))}
+      <div class="field"><label for="demoView">${esc(t('set.demoView'))}<span class="hint">${esc(t('set.demoViewHint'))}</span></label>
+        <select id="demoView" data-key="demoView">${['video', 'audio'].map(v => opt(v, t('audio.' + v), st.demoView)).join('')}</select></div>
     </div>
 
     <div class="group-title">${esc(t('set.gestures'))}</div>

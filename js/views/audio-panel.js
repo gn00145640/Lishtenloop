@@ -1,5 +1,7 @@
 // Transport controls shown in the player dock while the own-audio source is active
 // (YouTube mode uses YouTube's own controls instead). Lives for the whole app session.
+// Over the muted demo video the controls fade out after a few seconds of playback;
+// a tap brings them back (that tap does not trigger a button).
 import { esc, fmtTime, $ } from '../util.js';
 import { t } from '../i18n.js';
 import { icons } from '../icons.js';
@@ -7,12 +9,30 @@ import { store } from '../store.js';
 import { playback } from '../player/playback.js';
 import { STATE } from '../player/yt-adapter.js';
 
+const IDLE_HIDE_MS = 3000;
+
 export function initAudioPanel() {
   const panel = document.getElementById('audioPanel');
   let seeking = false;
+  let idleTimer = null;
+
+  const overVideo = () => panel.classList.contains('ap-over-video');
+  function wake() {
+    panel.classList.remove('ap-idle');
+    clearTimeout(idleTimer);
+    if (!overVideo()) return;
+    idleTimer = setTimeout(() => {
+      if (overVideo() && !seeking && (playback.aud.isPlaying() || playback.engine.waiting)) panel.classList.add('ap-idle');
+    }, IDLE_HIDE_MS);
+  }
+  // A tap on hidden controls only reveals them.
+  let swallowClick = false;
+  panel.addEventListener('pointerdown', () => { swallowClick = panel.classList.contains('ap-idle'); wake(); }, true);
+  panel.addEventListener('click', (e) => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
 
   function build() {
     const c = playback.content || {};
+    panel.classList.toggle('ap-over-video', !!playback.showingVideo);
     panel.innerHTML = `
       <div class="ap-bg" style="${c.thumb ? `background-image:url('${esc(c.thumb)}')` : ''}"></div>
       <div class="ap-top"><span class="ap-badge">${icons.music}${esc(t('audio.badge'))}</span></div>
@@ -33,6 +53,7 @@ export function initAudioPanel() {
     range.addEventListener('change', () => { playback.seekTo(rangeToTime(range.value)); seeking = false; });
     renderState();
     renderTime();
+    wake();
   }
 
   const skipSec = () => +store.settings.skipSeconds || 10;
@@ -73,7 +94,13 @@ export function initAudioPanel() {
   }
   playback.on('source', sync);
   playback.on('content', sync);
-  playback.on('state', (s) => { if (playback.source === 'audio') { renderState(); if (s === STATE.CUED) renderTime(); } });
+  playback.on('view', sync);
+  playback.on('state', (s) => {
+    if (playback.source !== 'audio') return;
+    renderState();
+    if (s === STATE.CUED) renderTime();
+    if (s === STATE.PLAYING) wake(); else if (s !== STATE.BUFFERING) { clearTimeout(idleTimer); panel.classList.remove('ap-idle'); }
+  });
   playback.on('loop', renderState);
   playback.on('time', renderTime);
   store.onChange((what) => { if (what === 'settings' && !panel.hidden) build(); });

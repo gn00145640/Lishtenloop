@@ -1,11 +1,11 @@
 // ListenLoop service worker: caches the app shell + demo captions only.
 // YouTube / Google API traffic is never cached or intercepted.
 // Cross-origin media (YouTube, VOA audio) is never cached or intercepted.
-const CACHE = 'listenloop-shell-v2';
+const CACHE = 'listenloop-shell-v3';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/store.js', 'js/i18n.js', 'js/icons.js', 'js/util.js', 'js/theme.js', 'js/content.js', 'js/components.js',
-  'js/player/yt-adapter.js', 'js/player/audio-adapter.js', 'js/player/media-session.js', 'js/player/loop-engine.js', 'js/player/playback.js',
+  'js/player/yt-adapter.js', 'js/player/audio-adapter.js', 'js/player/media-session.js', 'js/player/video-follower.js','js/player/loop-engine.js', 'js/player/playback.js',
   'js/views/audio-panel.js',
   'js/captions/sync.js', 'js/translate/index.js', 'js/translate/microsoft.js', 'js/translate/gemini.js', 'js/youtube/search.js',
   'js/views/home.js', 'js/views/player.js', 'js/views/favorites.js', 'js/views/history.js', 'js/views/settings.js',

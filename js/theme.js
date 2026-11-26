@@ -1,6 +1,6 @@
 import { store } from './store.js';
 
-export const APP_VERSION = '0.2.0 (prototype)';
+export const APP_VERSION = '0.3.0 (prototype)';
 
 /** Apply theme, caption size and colours from settings to :root. */
 export function applyTheme() {

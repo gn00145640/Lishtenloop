@@ -30,6 +30,7 @@ async function route() {
   const isPlayer = name === 'player' && arg;
 
   if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
+  playback.setPlayerPage(!!isPlayer);
   if (!isPlayer && playback.suspend()) toast(t('player.paused'));
 
   document.body.classList.toggle('route-player', !!isPlayer);

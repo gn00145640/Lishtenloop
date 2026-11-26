@@ -56,12 +56,12 @@ const dict = {
 
     'audio.source': '播放來源', 'audio.video': '影片', 'audio.audio': '純音訊',
     'audio.noteBg': '可背景播放、鎖屏控制，沒有廣告。',
-    'audio.noteVideo': 'YouTube 不支援背景播放；要鎖屏聆聽請切換「純音訊」。',
+    'audio.noteVideoBg': '鎖屏或切到背景時聲音不中斷，回來後影片自動接上。',
     'audio.badge': '純音訊・可背景播放', 'audio.prev': '上一句', 'audio.next': '下一句',
     'audio.back': '倒退 {n} 秒', 'audio.fwd': '快進 {n} 秒', 'audio.seek': '播放進度',
     'audio.playingBg': '背景播放中', 'audio.openPlayer': '開啟播放頁', 'audio.err': '切換來源失敗，請再試一次。',
     'audio.fallback': '音訊無法載入，已改用影片播放。',
-    'set.preferAudio': '示範內容預設使用純音訊', 'set.preferAudioHint': '可背景播放、鎖屏控制；只適用有授權音訊的內容',
+    'set.demoView': '示範內容預設畫面', 'set.demoViewHint': '兩種都可背景播放；純音訊比較省流量（影片約每分鐘 15MB）',
 
     'fav.title': '我的最愛', 'fav.searchPh': '搜尋最愛', 'fav.sort.added': '收藏日期', 'fav.sort.played': '最近播放',
     'fav.empty': '還沒有收藏。在播放頁點 ♥ 加入最愛。', 'fav.remove': '移除收藏', 'fav.removed': '已移除收藏', 'fav.added': '已加入最愛',
@@ -157,12 +157,12 @@ const dict = {
 
     'audio.source': 'Source', 'audio.video': 'Video', 'audio.audio': 'Audio only',
     'audio.noteBg': 'Plays in the background and on the lock screen, no ads.',
-    'audio.noteVideo': 'YouTube cannot play in the background; switch to Audio only to listen with the screen locked.',
+    'audio.noteVideoBg': 'Sound keeps playing when the screen locks; the video catches up when you return.',
     'audio.badge': 'Audio only · background OK', 'audio.prev': 'Previous sentence', 'audio.next': 'Next sentence',
     'audio.back': 'Back {n}s', 'audio.fwd': 'Forward {n}s', 'audio.seek': 'Position',
     'audio.playingBg': 'Playing in background', 'audio.openPlayer': 'Open player', 'audio.err': 'Could not switch source. Try again.',
     'audio.fallback': 'Audio unavailable; playing the video instead.',
-    'set.preferAudio': 'Open demo content as audio only', 'set.preferAudioHint': 'Background and lock-screen playback; only for content with licensed audio',
+    'set.demoView': 'Demo content opens as', 'set.demoViewHint': 'Both play in the background; audio only uses less data (video ≈ 15 MB per minute)',
 
     'fav.title': 'Favorites', 'fav.searchPh': 'Search favorites', 'fav.sort.added': 'Date added', 'fav.sort.played': 'Recently played',
     'fav.empty': 'No favorites yet. Tap ♥ on the player page.', 'fav.remove': 'Remove favorite', 'fav.removed': 'Removed', 'fav.added': 'Added to favorites',
