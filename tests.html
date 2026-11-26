@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ListenLoop Tests</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; background: #f6f7f9; color: #15191e; }
+  h1 { font-size: 20px; }
+  .ok { color: #0f766e; } .fail { color: #c0392b; font-weight: 600; }
+  pre { background: #fff; padding: 8px; border-radius: 8px; white-space: pre-wrap; }
+  #sum { font-size: 16px; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>ListenLoop unit tests</h1>
+<div id="sum">running…</div>
+<div id="out"></div>
+<script type="module">
+import { LoopEngine, END_EPS, SEEK_GUARD_MS } from './js/player/loop-engine.js';
+import { indexAt, splitSentences, parseTimedLines, mergeSegmentsToSentences, alignToPauses, detectPauses, toSentenceObjects, fromSentenceObjects } from './js/captions/sync.js';
+import { parseYouTubeId, parseIsoDuration, fmtTime } from './js/util.js';
+import { store } from './js/store.js';
+import { AudioAdapter } from './js/player/audio-adapter.js';
+import { STATE } from './js/player/yt-adapter.js';
+
+const results = [];
+const test = (name, fn) => { try { fn(); results.push([name, true]); } catch (e) { results.push([name, false, e.message]); } };
+const eq = (a, b, msg = '') => { const A = JSON.stringify(a), B = JSON.stringify(b); if (A !== B) throw new Error(`${msg} expected ${B} got ${A}`); };
+const ok = (c, msg) => { if (!c) throw new Error(msg || 'assertion failed'); };
+
+// ---- fake player + clock ----
+function rig(settings = {}) {
+  const clock = { now: 0 };
+  const p = {
+    t: 0, playing: true, seeks: [], plays: 0, pauses: 0,
+    getTime() { return this.t; }, seek(s) { this.t = s; this.seeks.push(s); }, play() { this.playing = true; this.plays++; }, pause() { this.playing = false; this.pauses++; },
+  };
+  const S = { repeatCount: 0, repeatInterval: 0, autoNext: false, ...settings };
+  const e = new LoopEngine(p, () => S, () => clock.now);
+  e.setSentences([{ start: 0, end: 2 }, { start: 2, end: 5 }, { start: 5, end: 9 }, { start: 9, end: 12 }]);
+  /** advance media time by dt seconds (only while playing) and wall clock by dt*1000 ms, ticking every 50 ms */
+  const run = (dt) => { for (let x = 0; x < dt; x += 0.05) { clock.now += 50; if (p.playing) p.t += 0.05; e.tick(); } };
+  return { p, e, S, clock, run };
+}
+
+test('indexAt binary search', () => {
+  const s = [{ start: 0 }, { start: 2 }, { start: 5 }];
+  eq([indexAt(s, -1), indexAt(s, 0), indexAt(s, 1.9), indexAt(s, 2), indexAt(s, 99)], [-1, 0, 0, 1, 2]);
+  eq(indexAt([], 3), -1);
+});
+
+test('repeat one loops forever by default', () => {
+  const { p, e, run } = rig();
+  e.repeatOne(1);
+  eq(p.t, 2, 'jumps to start');
+  run(3.2); // 2 → 5 then loop
+  ok(p.seeks.filter(s => s === 2).length >= 2, 'looped back to sentence start');
+  run(9);
+  eq(e.mode, 'one'); eq(e.target, 1);
+  ok(e.pass >= 3, 'pass count increases');
+  ok(p.t >= 2 && p.t < 5, 'stays inside sentence');
+});
+
+test('repeat one with count stops and continues normally', () => {
+  const { p, e, run } = rig({ repeatCount: 2 });
+  e.repeatOne(0);
+  run(2.1); // first pass ends → pass 2
+  eq(e.pass, 2);
+  run(2.2); // second pass ends → done
+  eq(e.mode, 'off');
+  run(1);
+  ok(p.t > 2, 'kept playing into next sentence');
+});
+
+test('repeat count + autoNext moves to next sentence', () => {
+  const { p, e, run } = rig({ repeatCount: 1, autoNext: true });
+  e.repeatOne(0);
+  run(2.1);
+  eq(e.mode, 'one'); eq(e.target, 1); eq(e.pass, 1);
+  ok(Math.abs(p.t - 2) < 0.2, 'at next sentence start');
+});
+
+test('interval pauses between loops then resumes', () => {
+  const { p, e, run } = rig({ repeatInterval: 1 });
+  e.repeatOne(0);
+  run(2.0);
+  ok(e.waiting, 'waiting during gap'); ok(!p.playing, 'paused during gap');
+  eq(p.t, 0, 'already seeked to start');
+  run(0.5); ok(e.waiting, 'still waiting at 0.5s');
+  run(0.6); ok(!e.waiting && p.playing, 'resumed after 1s');
+});
+
+test('pressing play during the gap resumes immediately', () => {
+  const { p, e, run } = rig({ repeatInterval: 3 });
+  e.repeatOne(0);
+  run(2.0);
+  ok(e.waiting);
+  e.cancelWait(true);
+  ok(!e.waiting && p.playing);
+});
+
+test('stop during gap resumes normal playback', () => {
+  const { p, e, run } = rig({ repeatInterval: 3 });
+  e.repeatOne(0); run(2.0);
+  e.stop();
+  eq(e.mode, 'off'); ok(p.playing, 'playing again');
+});
+
+test('range loop 1..2 wraps to sentence 1 start', () => {
+  const { p, e, run } = rig();
+  e.setRange(2, 1); // reversed order is normalised
+  eq(e.range, { a: 1, b: 2 });
+  eq(p.t, 2);
+  run(7.2); // 2 → 9 then wrap
+  ok(p.t >= 2 && p.t < 9, 'inside range');
+  ok(p.seeks.filter(s => s === 2).length >= 2, 'wrapped');
+});
+
+test('repeat all replays on ended', () => {
+  const { p, e } = rig();
+  e.setAll();
+  p.t = 12;
+  ok(e.onEnded(), 'handled');
+  eq(p.t, 0);
+  e.stop();
+  ok(!e.onEnded(), 'off → not handled');
+});
+
+test('seek guard ignores stale time right after a seek', () => {
+  const { p, e, clock } = rig();
+  e.repeatOne(1);
+  p.t = 5.5;            // stale value reported right after seek
+  clock.now += 100; e.tick();
+  eq(p.seeks.length, 1, 'no extra seek while guarded');
+  clock.now += SEEK_GUARD_MS; p.t = 2.1; e.tick();
+  eq(e.target, 1);
+});
+
+test('scrubbing far away retargets single loop', () => {
+  const { p, e, clock } = rig();
+  e.repeatOne(0);
+  clock.now += SEEK_GUARD_MS + 10;
+  p.t = 10; e.tick();
+  eq(e.target, 3);
+});
+
+test('goTo in one mode changes target; outside range cancels range', () => {
+  const { e } = rig();
+  e.repeatOne(0); e.goTo(2); eq(e.target, 2);
+  e.setRange(0, 1); e.goTo(3); eq(e.mode, 'off');
+});
+
+test('END_EPS is small', () => ok(END_EPS > 0 && END_EPS < 0.2));
+
+test('splitSentences handles abbreviations, quotes and decimals', () => {
+  eq(splitSentences('Hello there. Mr. Smith lives in the U.S. He paid 3.5 dollars! “Really?” she asked. ok'),
+    ['Hello there.', 'Mr. Smith lives in the U.S. He paid 3.5 dollars!', '“Really?” she asked. ok']); // no split before lowercase
+  eq(splitSentences('One. Two? Three!'), ['One.', 'Two?', 'Three!']);
+  eq(splitSentences(''), []);
+});
+
+test('parseTimedLines + merge interpolate sentence starts', () => {
+  const segs = parseTimedLines('0:00 Hello world. This is\n0:04 a test. Bye\n0:08\nnow.');
+  eq(segs.length, 3);
+  const out = mergeSegmentsToSentences(segs, 10);
+  eq(out.map(s => s.text), ['Hello world.', 'This is a test.', 'Bye now.']);
+  ok(out[1].start > 0 && out[1].start < 4, 'interpolated inside first segment');
+  ok(out[2].start >= 4 && out[2].start <= 8);
+});
+
+test('detectPauses finds silence in a synthetic signal', () => {
+  const sr = 8000, s = new Float32Array(sr * 3);
+  for (let i = 0; i < s.length; i++) { const t = i / sr; const loud = (t < 1 || t > 1.5); s[i] = loud ? Math.sin(t * 2 * Math.PI * 220) * 0.5 : (Math.random() - 0.5) * 0.001; }
+  const { silences } = detectPauses(s, sr);
+  ok(silences.some(([a, b]) => Math.abs(a - 1) < 0.05 && Math.abs(b - 1.5) < 0.05), JSON.stringify(silences));
+});
+
+test('alignToPauses snaps boundaries to pauses', () => {
+  const texts = ['Short one.', 'This is a much longer second sentence here.', 'End.'];
+  const sil = [[0, 0.3], [1.2, 1.6], [4.0, 4.5], [5.4, 6]];
+  const out = alignToPauses(texts, sil, 6);
+  // starts include a 0.12 s lead-in so the first word is not clipped when looping
+  eq(out.map(s => [s.start, s.end]), [[0.18, 1.2], [1.48, 4.0], [4.38, 5.4]]);
+});
+
+test('Sentence Object round trip', () => {
+  const objs = toSentenceObjects([{ start: 1, end: 2, text: 'Hi.', zh: '嗨。' }]);
+  eq(Object.keys(objs[0]).sort(), ['confidence', 'end_time', 'language', 'original_text', 'sentence_id', 'source', 'start_time', 'translated_text']);
+  const back = fromSentenceObjects(objs);
+  eq([back[0].start, back[0].end, back[0].en, back[0].zh, back[0].index], [1, 2, 'Hi.', '嗨。', 0]);
+});
+
+test('parseYouTubeId', () => {
+  eq(parseYouTubeId('https://www.youtube.com/watch?v=gBYnewP1MmY&t=10'), 'gBYnewP1MmY');
+  eq(parseYouTubeId('youtu.be/gBYnewP1MmY'), 'gBYnewP1MmY');
+  eq(parseYouTubeId('https://youtube.com/shorts/gBYnewP1MmY'), 'gBYnewP1MmY');
+  eq(parseYouTubeId('gBYnewP1MmY'), 'gBYnewP1MmY');
+  eq(parseYouTubeId('pie in the sky'), null);
+});
+
+test('parseIsoDuration / fmtTime', () => {
+  eq(parseIsoDuration('PT1H2M3S'), 3723); eq(parseIsoDuration('PT45S'), 45); eq(parseIsoDuration('bad'), 0);
+  eq([fmtTime(75.3), fmtTime(3725)], ['1:15', '1:02:05']);
+});
+
+test('store favorites / progress (isolated)', () => {
+  const backup = localStorage.getItem('listenloop:v1');
+  try {
+    store._reset();
+    store.addFavorite({ id: 'abcdefghijk', title: 'T' });
+    ok(store.isFavorite('abcdefghijk'));
+    eq(store.toggleFavorite({ id: 'abcdefghijk' }), false);
+    store.saveProgress({ id: 'abcdefghijk', time: 12, addListened: 5 });
+    store.saveProgress({ id: 'abcdefghijk', time: 20, addListened: 5 });
+    eq(store.getProgress('abcdefghijk').listenedSec, 10);
+    eq(store.getProgress('abcdefghijk').time, 20);
+    store.setSetting('rate', 1.25); eq(store.settings.rate, 1.25);
+    let threw = false; try { store.setSetting('nope', 1); } catch { threw = true; } ok(threw, 'unknown setting rejected');
+  } finally {
+    if (backup === null) localStorage.removeItem('listenloop:v1'); else localStorage.setItem('listenloop:v1', backup);
+    store._reload();
+  }
+});
+
+// ---- AudioAdapter with a fake media element ----
+function fakeMedia() {
+  const el = new EventTarget();
+  Object.assign(el, {
+    currentTime: 0, duration: 60, playbackRate: 1, paused: true, ended: false, readyState: 0, src: '',
+    play() { this.paused = false; this.dispatchEvent(new Event('playing')); return Promise.resolve(); },
+    pause() { this.paused = true; this.dispatchEvent(new Event('pause')); },
+    load() { this.readyState = 1; queueMicrotask(() => this.dispatchEvent(new Event('loadedmetadata'))); },
+    removeAttribute() { this.src = ''; },
+  });
+  el.addEventListener('ratechange', () => {});
+  return el;
+}
+
+test('AudioAdapter maps offset between YouTube and audio timelines', () => {
+  const el = fakeMedia();
+  const a = new AudioAdapter(el);
+  a.offset = 1.5;                       // YouTube time = audio time + 1.5
+  el.currentTime = 10;
+  eq(a.getTime(), 11.5, 'getTime adds offset');
+  a.seek(20); eq(el.currentTime, 18.5, 'seek subtracts offset');
+  a.seek(0.5); eq(el.currentTime, 0, 'never seeks below 0');
+  a.seek(999); ok(el.currentTime < 60, 'clamped to duration');
+  eq(a.getDuration(), 61.5);
+});
+
+test('AudioAdapter state + rate mapping', () => {
+  const el = fakeMedia();
+  const a = new AudioAdapter(el);
+  const states = [];
+  a.on('state', s => states.push(s));
+  a.play(); ok(a.isPlaying(), 'playing');
+  el.dispatchEvent(new Event('waiting')); ok(a.isPlaying(), 'buffering counts as playing');
+  a.pause(); ok(!a.isPlaying(), 'paused');
+  el.ended = true; el.dispatchEvent(new Event('ended'));
+  eq(states, [STATE.PLAYING, STATE.BUFFERING, STATE.PAUSED, STATE.ENDED]);
+  a.setRate(3); eq(el.playbackRate, 2, 'rate clamped to 2');
+  a.setRate(0.75); eq(a.getRate(), 0.75);
+});
+
+test('LoopEngine single-sentence loop works on AudioAdapter (with offset)', () => {
+  const el = fakeMedia();
+  const a = new AudioAdapter(el);
+  a.offset = 0.4;
+  const clock = { now: 0 };
+  const e = new LoopEngine(a, () => ({ repeatCount: 0, repeatInterval: 0 }), () => clock.now);
+  e.setSentences([{ start: 0, end: 2 }, { start: 2, end: 5 }, { start: 5, end: 9 }]);
+  e.repeatOne(1);
+  ok(Math.abs(el.currentTime - 1.6) < 1e-9, 'jumped to sentence start in audio time');
+  let loops = 0;
+  for (let x = 0; x < 8; x += 0.05) {
+    clock.now += 50;
+    if (!el.paused) el.currentTime += 0.05;
+    const before = el.currentTime; e.tick(); if (el.currentTime < before - 1) loops++;
+  }
+  ok(loops >= 2, 'looped back at least twice, got ' + loops);
+  ok(a.getTime() >= 2 && a.getTime() < 5.1, 'stays inside sentence');
+});
+
+// async checks
+(async () => {
+  try {
+    const el = fakeMedia();
+    const a = new AudioAdapter(el);
+    let ready = 0; a.on('ready', () => ready++);
+    await a.load({ src: 'x.mp4', offset: 0 }, { start: 12, rate: 1.25 });
+    ok(a.isReady && ready === 1, 'ready after metadata');
+    eq(el.currentTime, 12, 'starts at requested time'); eq(el.playbackRate, 1.25, 'rate applied');
+    results.push(['AudioAdapter.load resolves on metadata, applies start + rate', true]);
+  } catch (e) { results.push(['AudioAdapter.load resolves on metadata, applies start + rate', false, e.message]); }
+  try {
+    const idx = await (await fetch('data/demo/index.json')).json();
+    for (const it of idx.items) {
+      ok(it.audio && /^https:\/\//.test(it.audio.src) && Number.isFinite(it.audio.offset), it.id + ' audio field');
+    }
+    results.push(['demo index: every demo has audio { src, offset }', true]);
+  } catch (e) { results.push(['demo index: every demo has audio { src, offset }', false, e.message]); }
+  try {
+    const idx = await (await fetch('data/demo/index.json')).json();
+    for (const it of idx.items) {
+      const d = await (await fetch(it.captions)).json();
+      const s = d.sentences;
+      ok(s.length > 0, it.id + ' empty');
+      s.forEach((x, i) => {
+        ok(x.end_time > x.start_time, `${it.id} #${i + 1} end>start`);
+        ok(x.translated_text, `${it.id} #${i + 1} missing zh`);
+        if (i) ok(x.start_time >= s[i - 1].start_time, `${it.id} #${i + 1} order`);
+        ok(x.end_time <= it.duration + 1, `${it.id} #${i + 1} beyond duration`);
+      });
+    }
+    results.push(['demo caption files: order, zh, bounds', true]);
+  } catch (e) { results.push(['demo caption files: order, zh, bounds', false, e.message]); }
+  const pass = results.filter(r => r[1]).length;
+  document.getElementById('sum').innerHTML = `<span class="${pass === results.length ? 'ok' : 'fail'}">${pass} / ${results.length} passed</span>`;
+  document.getElementById('out').innerHTML = results.map(([n, good, err]) => `<div class="${good ? 'ok' : 'fail'}">${good ? '✔' : '✘'} ${n}${err ? `<pre>${err}</pre>` : ''}</div>`).join('');
+  window.__TEST_RESULTS = { pass, total: results.length, failed: results.filter(r => !r[1]) };
+})();
+</script>
+</body>
+</html>

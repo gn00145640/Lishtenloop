@@ -1,0 +1,18 @@
+{
+  "content_id": "DJmnSXDGrBc",
+  "language": "en",
+  "source": "VOA Learning English transcript (public domain)",
+  "timing": "reviewed",
+  "timing_method": "pause detection on VOA media + checked against the video's burned-in captions",
+  "translation": "manual (zh-Hant, Taiwan)",
+  "sentences": [
+    { "sentence_id": "s001", "start_time": 0.0, "end_time": 5.33, "original_text": "Welcome to the Voice of America’s News Words.", "translated_text": "歡迎收看美國之音的「新聞單字」。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s002", "start_time": 5.45, "end_time": 13.72, "original_text": "A museum in Miami, Florida specializes in works of art that stretch the imagination.", "translated_text": "佛羅里達州邁阿密的一間博物館，專門展出挑戰想像力的藝術作品。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s003", "start_time": 13.89, "end_time": 18.1, "original_text": "Illusion.", "translated_text": "Illusion（錯覺）。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s004", "start_time": 18.14, "end_time": 24.91, "original_text": "The Miami Paradox Museum is one of several paradox museums across the world.", "translated_text": "邁阿密悖論博物館是全球幾間悖論博物館之一。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s005", "start_time": 25.94, "end_time": 32.77, "original_text": "More than 70 of its displays produce optical illusions worthy of a photograph.", "translated_text": "館內超過 70 件展品會產生值得拍照留念的視覺錯覺。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s006", "start_time": 33.98, "end_time": 40.59, "original_text": "The museum explains the math and science behind each illusion.", "translated_text": "博物館會說明每一種錯覺背後的數學與科學原理。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s007", "start_time": 40.94, "end_time": 47.41, "original_text": "An illusion is anything that is false or not real but that seems to be true or real.", "translated_text": "Illusion 指的是任何虛假、不真實，卻看起來像真的一樣的事物。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s008", "start_time": 48.27, "end_time": 59.68, "original_text": "An optical illusion tricks your eyes to make you think you see something that is not present or that looks different in reality.", "translated_text": "視覺錯覺會欺騙你的眼睛，讓你以為看到了不存在的東西，或是看到與實際不同的樣子。", "language": "en", "source": "transcript", "confidence": 0.85 }
+  ]
+}

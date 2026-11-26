@@ -1,0 +1,24 @@
+{
+  "content_id": "DLi2txV9IVc",
+  "language": "en",
+  "source": "VOA Learning English transcript (public domain)",
+  "timing": "reviewed",
+  "timing_method": "pause detection on VOA media + checked against the video's burned-in captions",
+  "translation": "manual (zh-Hant, Taiwan)",
+  "sentences": [
+    { "sentence_id": "s001", "start_time": 0.13, "end_time": 6.39, "original_text": "Welcome to English in a Minute!", "translated_text": "歡迎收看「一分鐘學英語」！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s002", "start_time": 7.38, "end_time": 11.16, "original_text": "Some people use a large ball for exercise.", "translated_text": "有些人會用大球來運動。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s003", "start_time": 12.2, "end_time": 15.37, "original_text": "Is that what to get “on the ball” means?", "translated_text": "「get on the ball」是這個意思嗎？", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s004", "start_time": 15.48, "end_time": 18.99, "original_text": "Hi Anna! How has your day been?", "translated_text": "嗨，Anna！妳今天過得怎麼樣？", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s005", "start_time": 19.02, "end_time": 21.11, "original_text": "Great! Very great! Very productive!", "translated_text": "很棒！非常棒！超有效率！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s006", "start_time": 21.19, "end_time": 24.84, "original_text": "I finished three reports and have only one more to do!", "translated_text": "我完成了三份報告，只剩一份要做！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s007", "start_time": 24.97, "end_time": 25.97, "original_text": "Wow, you are on the ball!", "translated_text": "哇，妳的效率真高！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s008", "start_time": 26.47, "end_time": 27.43, "original_text": "How did you do them so fast?", "translated_text": "妳怎麼做得這麼快？", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s009", "start_time": 27.76, "end_time": 31.2, "original_text": "Coffee! Lots of coffee. Do you want some?", "translated_text": "咖啡！很多很多咖啡。你要來一點嗎？", "language": "en", "source": "transcript", "confidence": 0.8 },
+    { "sentence_id": "s010", "start_time": 31.3, "end_time": 34.52, "original_text": "I’ll get it. I’d love more coffee. Thank you!", "translated_text": "我去拿。我很想再喝點咖啡。謝謝你！", "language": "en", "source": "transcript", "confidence": 0.8 },
+    { "sentence_id": "s011", "start_time": 34.76, "end_time": 38.47, "original_text": "Uh, sure. But maybe not that much coffee.", "translated_text": "呃，好啊。不過也許不用那麼多咖啡。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s012", "start_time": 38.88, "end_time": 46.82, "original_text": "Someone who is “on the ball” finishes work quickly and ahead of time.", "translated_text": "「on the ball」的人做事又快，還能提前完成。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s013", "start_time": 47.61, "end_time": 54.55, "original_text": "We can also say a person should “get on the ball” when they need to work faster or better.", "translated_text": "當某人需要做得更快或更好時，我們也可以說他應該「get on the ball（打起精神）」。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s014", "start_time": 55.27, "end_time": 59.15, "original_text": "And that’s English in a Minute!", "translated_text": "以上就是「一分鐘學英語」！", "language": "en", "source": "transcript", "confidence": 0.85 }
+  ]
+}

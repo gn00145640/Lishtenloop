@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caption Timer</title>
+<link rel="stylesheet" href="../css/app.css">
+<style>
+  body { padding: 16px; }
+  #app { max-width: 980px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  textarea, input[type=text], input[type=number] { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px 10px; }
+  textarea { min-height: 140px; font: 14px/1.45 ui-monospace, Consolas, monospace; }
+  label.blk { display: block; font-size: 13px; color: var(--text-2); margin: 12px 0 4px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; align-items: center; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .yt { position: sticky; top: 8px; }
+  .yt .frame { aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; }
+  .yt .frame iframe, .yt .frame > div { width: 100%; height: 100%; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { border-top: 1px solid var(--line); padding: 6px 4px; vertical-align: top; }
+  td.n { color: var(--text-3); width: 28px; }
+  td.tm { width: 150px; white-space: nowrap; }
+  td.tm input { width: 64px; padding: 4px; font-variant-numeric: tabular-nums; }
+  tr.cur { background: var(--hl); }
+  td .en { font-size: 14px; }
+  td input.zh { margin-top: 4px; padding: 4px 8px; }
+  .log { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--text-2); white-space: pre-wrap; }
+  .sm { min-height: 30px; padding: 0 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>字幕打點工具 <span class="badge gray">internal</span></h1>
+  <p class="tiny">貼上逐字稿（一行一句，或整段自動切句）→ 用公有領域/授權媒體檔分析停頓自動對齊 → 用 YouTube 官方播放器逐句檢查、微調、打點 → 匯出 Sentence Object JSON。</p>
+
+  <div class="grid">
+    <div>
+      <label class="blk">從 demo-sources.json 載入</label>
+      <select id="srcSel" style="width:100%;min-height:36px;border:1px solid var(--line);border-radius:10px;background:var(--surface)"><option value="">—</option></select>
+      <div class="bar"><button class="btn" id="loadDemo">載入現有示範字幕（data/demo）</button></div>
+      <label class="blk">YouTube 影片 ID 或網址</label>
+      <input type="text" id="vid" placeholder="例如 gBYnewP1MmY">
+      <label class="blk">對齊用媒體檔 URL（必須是公有領域或已授權的檔案，例如 VOA 官網 mp4；不可使用 YouTube 音訊）</label>
+      <input type="text" id="media" placeholder="https://voa-video-ns.akamaized.net/....mp4">
+      <label class="blk">時間偏移（秒，YouTube 版本若比媒體檔多片頭可調整）</label>
+      <input type="number" id="offset" value="0" step="0.05" style="width:120px">
+      <label class="blk">英文逐字稿</label>
+      <textarea id="text" placeholder="一行一句"></textarea>
+      <div class="bar">
+        <button class="btn" id="split">切句（不含時間）</button>
+        <button class="btn primary" id="align">分析停頓並自動對齊</button>
+        <button class="btn" id="tr">自動翻譯缺少的中文</button>
+        <span class="tiny" id="status"></span>
+      </div>
+    </div>
+    <div class="yt">
+      <div class="frame"><div id="yt"></div></div>
+      <div class="bar">
+        <button class="btn" id="load">載入影片</button>
+        <button class="btn" id="tap" title="播放中按 T 或此按鈕：標記下一句開始">打點：下一句開始 (T)</button>
+        <span class="tiny" id="clock">0.00</span>
+      </div>
+      <div class="bar">
+        <button class="btn" id="export">匯出 JSON</button>
+        <button class="btn" id="import">匯入 JSON</button>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+  <table id="rows"></table>
+  <label class="blk">輸出 / 匯入</label>
+  <textarea id="out" style="min-height:200px"></textarea>
+</div>
+
+<script type="module">
+import { splitSentences, detectPauses, alignToPauses, toSentenceObjects, fromSentenceObjects } from '../js/captions/sync.js';
+import { parseYouTubeId, esc } from '../js/util.js';
+import { translateTexts } from '../js/translate/index.js';
+
+const $ = (id) => document.getElementById(id);
+let rows = [];          // [{start,end,text,zh}]
+let player = null, cur = -1, tapIdx = 0, loopRow = -1;
+const log = (m) => { $('log').textContent = m + '\n' + $('log').textContent; };
+const status = (m) => { $('status').textContent = m; };
+
+let sources = [];
+fetch('demo-sources.json').then(r => r.json()).then(d => {
+  sources = d.items || [];
+  $('srcSel').innerHTML += sources.map((s, i) => `<option value="${i}">${esc(s.title)}</option>`).join('');
+}).catch(() => {});
+$('srcSel').onchange = () => {
+  const s = sources[+$('srcSel').value]; if (!s) return;
+  $('vid').value = s.id; $('media').value = s.media; $('text').value = s.texts.join('\n');
+};
+$('loadDemo').onclick = async () => {
+  const id = parseYouTubeId($('vid').value);
+  if (!id) return status('先選擇或輸入影片 ID');
+  try {
+    const d = await (await fetch(`../data/demo/${id}.json`)).json();
+    $('out').value = JSON.stringify(d, null, 2);
+    $('import').click();
+  } catch { status('data/demo 沒有這部影片的字幕'); }
+};
+
+function textsFromInput() {
+  const raw = $('text').value.trim();
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  return lines.length > 1 ? lines : splitSentences(raw);
+}
+
+$('split').onclick = () => {
+  const texts = textsFromInput();
+  rows = texts.map((text, i) => ({ text, zh: rows[i]?.text === text ? rows[i].zh : '', start: rows[i]?.start ?? 0, end: rows[i]?.end ?? 0 }));
+  render();
+};
+
+$('align').onclick = async () => {
+  const texts = textsFromInput();
+  const url = $('media').value.trim();
+  if (!url) return status('請填媒體檔 URL');
+  status('下載並解碼音訊…');
+  try {
+    const buf = await (await fetch(url)).arrayBuffer();
+    const ctx = new OfflineAudioContext(1, 16000, 16000);
+    const audio = await ctx.decodeAudioData(buf);
+    const { duration, silences } = detectPauses(audio.getChannelData(0), audio.sampleRate);
+    log(`duration ${duration.toFixed(2)}s, ${silences.length} pauses`);
+    const off = +$('offset').value || 0;
+    const aligned = alignToPauses(texts, silences, duration).map(s => ({ ...s, start: +(s.start + off).toFixed(2), end: +(s.end + off).toFixed(2) }));
+    rows = aligned.map((s, i) => ({ ...s, zh: rows.find(r => r.text === s.text)?.zh || '' }));
+    render();
+    status(`已對齊 ${rows.length} 句（估計值，請逐句檢查）`);
+  } catch (e) {
+    status('失敗：' + e.message + '（可能是 CORS；可改在媒體網站的頁面執行，或手動打點）');
+  }
+};
+
+$('tr').onclick = async () => {
+  const todo = rows.filter(r => !r.zh);
+  if (!todo.length) return status('沒有缺少中文的句子');
+  status('翻譯中…');
+  try {
+    const out = await translateTexts(todo.map(r => r.text));
+    todo.forEach((r, i) => { r.zh = out[i]; });
+    render(); status(`已翻譯 ${todo.length} 句`);
+  } catch (e) { status(e.code === 'pending' ? '翻譯服務待設定（到 App 設定填 Key）' : '翻譯失敗：' + e.message); }
+};
+
+function render() {
+  $('rows').innerHTML = rows.map((r, i) => `<tr data-i="${i}" class="${i === cur ? 'cur' : ''}">
+    <td class="n">${i + 1}</td>
+    <td class="tm">
+      <input type="number" step="0.05" data-f="start" value="${r.start}"> →
+      <input type="number" step="0.05" data-f="end" value="${r.end}"><br>
+      <button class="btn sm" data-a="play">▶</button>
+      <button class="btn sm" data-a="loop">⟲</button>
+      <button class="btn sm" data-a="minus">−.1</button>
+      <button class="btn sm" data-a="plus">+.1</button>
+    </td>
+    <td><div class="en">${esc(r.text)}</div><input type="text" class="zh" data-f="zh" value="${esc(r.zh)}" placeholder="中文"></td>
+  </tr>`).join('');
+}
+
+$('rows').addEventListener('change', (e) => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  const r = rows[+tr.dataset.i]; const f = e.target.dataset.f;
+  r[f] = f === 'zh' ? e.target.value : +e.target.value;
+  if (f === 'start' && +tr.dataset.i > 0) rows[+tr.dataset.i - 1].end = r.start;
+});
+$('rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const i = +b.closest('tr').dataset.i, r = rows[i];
+  if (b.dataset.a === 'play') { loopRow = -1; playFrom(r.start); }
+  if (b.dataset.a === 'loop') { loopRow = loopRow === i ? -1 : i; playFrom(r.start); }
+  if (b.dataset.a === 'minus' || b.dataset.a === 'plus') {
+    const d = b.dataset.a === 'plus' ? 0.1 : -0.1;
+    r.start = +(r.start + d).toFixed(2); if (i > 0) rows[i - 1].end = r.start;
+    render(); playFrom(r.start);
+  }
+});
+
+function playFrom(t) { if (!player) return status('先載入影片'); player.seekTo(t, true); player.playVideo(); }
+
+$('load').onclick = () => {
+  const id = parseYouTubeId($('vid').value);
+  if (!id) return status('影片 ID 無效');
+  if (player) { player.loadVideoById(id); return; }
+  const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api';
+  window.onYouTubeIframeAPIReady = () => {
+    player = new YT.Player('yt', { videoId: id, playerVars: { playsinline: 1, rel: 0, origin: location.origin } });
+    setInterval(tick, 50);
+  };
+  document.head.appendChild(s);
+};
+
+function tick() {
+  if (!player?.getCurrentTime) return;
+  const t = player.getCurrentTime();
+  $('clock').textContent = t.toFixed(2) + 's';
+  if (loopRow >= 0 && rows[loopRow] && t >= rows[loopRow].end - 0.05) player.seekTo(rows[loopRow].start, true);
+  let i = -1; rows.forEach((r, k) => { if (r.start <= t) i = k; });
+  if (i !== cur) { cur = i; document.querySelectorAll('#rows tr').forEach(tr => tr.classList.toggle('cur', +tr.dataset.i === cur)); }
+}
+
+function tap() {
+  if (!player) return;
+  const t = +player.getCurrentTime().toFixed(2);
+  if (tapIdx >= rows.length) tapIdx = 0;
+  rows[tapIdx].start = t; if (tapIdx > 0) rows[tapIdx - 1].end = t;
+  if (tapIdx === rows.length - 1) rows[tapIdx].end = Math.max(rows[tapIdx].end, t + 2);
+  status(`第 ${tapIdx + 1} 句開始 = ${t}`); tapIdx++; render();
+}
+$('tap').onclick = tap;
+document.addEventListener('keydown', (e) => { if (e.key === 't' && !e.target.closest('input,textarea')) tap(); });
+
+$('export').onclick = () => {
+  const id = parseYouTubeId($('vid').value) || '';
+  const data = { content_id: id, language: 'en', source: 'transcript', timing: 'reviewed', sentences: toSentenceObjects(rows, { source: 'transcript' }) };
+  $('out').value = JSON.stringify(data, null, 2);
+  $('out').select();
+};
+$('import').onclick = () => {
+  try {
+    const d = JSON.parse($('out').value);
+    if (d.content_id) $('vid').value = d.content_id;
+    rows = fromSentenceObjects(d.sentences).map(s => ({ start: s.start, end: s.end, text: s.en, zh: s.zh }));
+    $('text').value = rows.map(r => r.text).join('\n');
+    render(); status(`已匯入 ${rows.length} 句`);
+  } catch (e) { status('JSON 格式錯誤：' + e.message); }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "content_id": "gBYnewP1MmY",
+  "language": "en",
+  "source": "VOA Learning English transcript (public domain)",
+  "timing": "reviewed",
+  "timing_method": "pause detection on VOA media + checked against the video's burned-in captions",
+  "translation": "manual (zh-Hant, Taiwan)",
+  "sentences": [
+    { "sentence_id": "s001", "start_time": 0.13, "end_time": 6.48, "original_text": "Welcome to English in a Minute.", "translated_text": "歡迎收看「一分鐘學英語」。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s002", "start_time": 6.59, "end_time": 9.57, "original_text": "Pie is a delicious dessert!", "translated_text": "派是一種美味的甜點！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s003", "start_time": 10.16, "end_time": 15.39, "original_text": "And there are so many different flavors, like cherry, lemon, banana cream!", "translated_text": "而且有好多不同的口味，像是櫻桃、檸檬、香蕉奶油！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s004", "start_time": 15.79, "end_time": 20.05, "original_text": "But what could the idiom “pie in the sky” mean?", "translated_text": "但是「pie in the sky（天上的派）」這個慣用語是什麼意思呢？", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s005", "start_time": 20.32, "end_time": 25.91, "original_text": "Pedro is finally moving to Hollywood to follow his acting dream.", "translated_text": "Pedro 終於要搬去好萊塢，追逐他的演員夢了。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s006", "start_time": 26.0, "end_time": 30.51, "original_text": "He’s been talking about that for years.", "translated_text": "這件事他已經講了好幾年了。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s007", "start_time": 30.85, "end_time": 33.64, "original_text": "His plans are just pie in the sky.", "translated_text": "他的計畫根本是空中樓閣。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s008", "start_time": 33.97, "end_time": 38.36, "original_text": "His YouTube channel has over four million subscribers!", "translated_text": "他的 YouTube 頻道有超過四百萬名訂閱者耶！", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s009", "start_time": 38.76, "end_time": 40.73, "original_text": "Four million? Hmm.", "translated_text": "四百萬？嗯……", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s010", "start_time": 40.92, "end_time": 48.86, "original_text": "Anything “pie in the sky” could be great but probably won’t happen.", "translated_text": "任何「pie in the sky」的事情或許很美好，但大概不會發生。", "language": "en", "source": "transcript", "confidence": 0.85 },
+    { "sentence_id": "s011", "start_time": 49.04, "end_time": 59.18, "original_text": "As an adjective, “pie in the sky” describes dreams, goals, or plans that are unlikely to become reality.", "translated_text": "當作形容詞時，「pie in the sky」用來形容不太可能實現的夢想、目標或計畫。", "language": "en", "source": "transcript", "confidence": 0.85 }
+  ]
+}

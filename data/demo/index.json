@@ -1,0 +1,13 @@
+{
+  "note": "Built-in demo content. VOA Learning English (Voice of America, U.S. government work, public domain). Video plays through the official YouTube player; 'audio' is the same public-domain media hosted by VOA, played with HTML5 audio for background / lock-screen listening. audio.offset = YouTube time - audio time (measured by pause matching: 0 for all four).",
+  "items": [
+    { "id": "gBYnewP1MmY", "title": "English in a Minute: Pie in the Sky", "channel": "VOA Learning English", "duration": 60, "level": "A2", "topic": "Idioms", "captions": "data/demo/gBYnewP1MmY.json",
+      "audio": { "src": "https://voa-video-ns.akamaized.net/pangeavideo/2025/03/6/61/61ff5e6f-7a99-4217-0879-08dd5c8d307c_240p.mp4?cb=edf61452e", "offset": 0 } },
+    { "id": "DLi2txV9IVc", "title": "English in a Minute: On the Ball", "channel": "VOA Learning English", "duration": 60, "level": "A2", "topic": "Idioms", "captions": "data/demo/DLi2txV9IVc.json",
+      "audio": { "src": "https://voa-video-ns.akamaized.net/pangeavideo/2025/02/6/64/64180526-8845-4728-03e3-08dd4a817621_240p.mp4?cb=edf52cd1d", "offset": 0 } },
+    { "id": "No49Qxer8pY", "title": "Everyday Grammar Video: Goodbye In Informal Conversations", "channel": "VOA Learning English", "duration": 121, "level": "B1", "topic": "Grammar", "captions": "data/demo/No49Qxer8pY.json",
+      "audio": { "src": "https://voa-video-ns.akamaized.net/pangeavideo/2025/02/9/9d/9d7e0301-d488-45b3-fadf-08dd4a817620_240p.mp4?cb=edf4efbf5", "offset": 0 } },
+    { "id": "DJmnSXDGrBc", "title": "News Words: Illusion", "channel": "VOA Learning English", "duration": 60, "level": "B1", "topic": "Vocabulary", "captions": "data/demo/DJmnSXDGrBc.json",
+      "audio": { "src": "https://voa-video-ns.akamaized.net/pangeavideo/2025/03/f/fb/fb6c4941-8db1-474d-06a5-08dd5c8b1668_240p.mp4?cb=edf63aacf", "offset": 0 } }
+  ]
+}
